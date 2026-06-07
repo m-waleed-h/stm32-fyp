@@ -1,0 +1,6 @@
+../Core/Src/rtc_manager.c:20:6:RTC_Manager_Init	16	static
+../Core/Src/rtc_manager.c:42:6:RTC_Tick	8	static
+../Core/Src/rtc_manager.c:52:16:GetHourFromRTC	16	static
+../Core/Src/rtc_manager.c:63:9:RTC_GetHour	8	static
+../Core/Src/rtc_manager.c:68:9:RTC_IsRushHour	16	static
+../Core/Src/rtc_manager.c:76:9:RTC_IsNight	16	static

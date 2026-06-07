@@ -1,0 +1,2 @@
+../Core/Src/serialControl.c:22:6:HAL_UART_TxCpltCallback	2
+../Core/Src/serialControl.c:35:19:UART_Transmit_DMA	3

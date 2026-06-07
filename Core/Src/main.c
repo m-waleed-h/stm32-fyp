@@ -22,7 +22,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "ds3231.h"
+
+#include "rtc_manager.h"
+#include "traffic_controller.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,6 +57,7 @@ const osThreadAttr_t defaultTask_attributes = {
 /* USER CODE BEGIN PV */
 
 RTC_TimeDate time;
+osThreadId_t trafficTaskHandle;
 
 /* USER CODE END PV */
 
@@ -73,7 +76,8 @@ void StartDefaultTask(void *argument);
 /* USER CODE BEGIN 0 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == RTC_INT_In_Pin){
-
+    // DS3231 1Hz pulse → release RTC tick semaphore
+    RTC_Tick();
 	}
 }
 /* USER CODE END 0 */
@@ -110,9 +114,7 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  DS3231_Init(&hi2c1);
-  DS3231_SetInterruptMode(S3231_SQUARE_WAVE_INTERRUPT);
-  void DS3231_SetRateSelect(DS3231_1HZ);
+
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -124,6 +126,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
+  RTC_Manager_Init(&hi2c1);   // creates rtcTickSemaphore
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -140,6 +143,12 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+  const osThreadAttr_t trafficTask_attr = {
+      .name       = "TrafficMgr",
+      .stack_size = 256 * 4,
+      .priority   = osPriorityNormal,
+  };
+  trafficTaskHandle = osThreadNew(TrafficManagerTask, NULL, &trafficTask_attr);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
