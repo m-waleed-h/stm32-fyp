@@ -23,6 +23,18 @@
  * @brief  Initialize traffic controller.
  *         Call AFTER RTC_Manager_Init(), BEFORE osKernelStart().
  */
+// Current light state — shared with uart_handler for status TX
+typedef struct {
+    uint8_t  activePanel;      // 1 or 2
+    char     state[8];         // "green", "yellow", "night"
+    uint32_t greenSeconds;     // current green duration
+    uint8_t  healthOk;         // 1=ok, 0=fault
+    uint8_t  nightMode;        // 1=night blink active
+} TrafficState_t;
+
+extern volatile TrafficState_t gTrafficState;
+
+
 void Traffic_Init(void);
 
 /**

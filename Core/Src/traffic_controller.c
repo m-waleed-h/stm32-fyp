@@ -1,159 +1,205 @@
 /**
- * traffic_controller.c
- * --------------------
- * 2-panel traffic light sequencing using FreeRTOS + DS3231 RTC ticks.
- *
- * Timing logic:
- *   - Rush hour  (7-9 AM, 5-7 PM) → greenSeconds = 8
- *   - Night mode (11 PM - 5 AM)   → greenSeconds = 3
- *   - Normal                       → greenSeconds = 5
- *   - Manual override via Traffic_SetGreenTime() (e.g. from UART task)
+ * traffic_controller.c — Final Version
+ * -------------------------------------
+ * Timing priority:
+ *   1. Orange Pi YOLO density → proportional green time
+ *   2. RTC time-of-day fallback → rush hour / normal
+ *   3. Night mode (23:00–05:00) → yellow blink both panels
  */
 
 #include "traffic_controller.h"
 #include "rtc_manager.h"
+#include "uart_handler.h"
+#include <string.h>
 
 // ============================================================
-// Light pattern bit definitions
+// Pin bit definitions
 // ============================================================
-// Bit:   5        4        3        2        1        0
-// Pin: LATCH6  LATCH5  LATCH4  LATCH3  LATCH2  LATCH1
-//      P2_GRN  P2_YLW  P2_RED  P1_GRN  P1_YLW  P1_RED
-
-#define P1_RED    (1 << 0)   // LATCH_1 — PB4 — Panel 1 Red
-#define P1_YELLOW (1 << 1)   // LATCH_2 — PB5 — Panel 1 Yellow
-#define P1_GREEN  (1 << 2)   // LATCH_3 — PB0 — Panel 1 Green
-#define P2_RED    (1 << 3)   // LATCH_4 — PB1 — Panel 2 Red
-#define P2_YELLOW (1 << 4)   // LATCH_5 — PA1 — Panel 2 Yellow
-#define P2_GREEN  (1 << 5)   // LATCH_6 — PA0 — Panel 2 Green
+#define P1_RED    (1 << 0)   // LATCH_1 PB4
+#define P1_YELLOW (1 << 1)   // LATCH_2 PB5
+#define P1_GREEN  (1 << 2)   // LATCH_3 PB0
+#define P2_RED    (1 << 3)   // LATCH_4 PB1
+#define P2_YELLOW (1 << 4)   // LATCH_5 PA1
+#define P2_GREEN  (1 << 5)   // LATCH_6 PA0
 
 // ============================================================
-// Private state
+// Timing constants
 // ============================================================
+#define TOTAL_GREEN_BUDGET   20u   // total seconds per cycle
+#define MIN_GREEN             4u   // minimum green per panel
+#define MAX_GREEN            14u   // maximum green per panel
+#define YELLOW_SEC            2u   // fixed yellow duration
 
-typedef enum {
-    TIMING_AUTO,    // RTC-based automatic (rush hour / night / normal)
-    TIMING_MANUAL   // Overridden via Traffic_SetGreenTime() or UART
-} TimingMode_t;
-
-static volatile uint32_t   greenSeconds  = 5;
-static volatile uint32_t   yellowSeconds = 2;  // always fixed
-static volatile TimingMode_t timingMode  = TIMING_AUTO;
+#define CLAMP(x,lo,hi) ((x)<(lo)?(lo):((x)>(hi)?(hi):(x)))
 
 // ============================================================
-// Private: Set light pattern on latch
+// Shared state — read by uart_handler to build status JSON
 // ============================================================
+volatile TrafficState_t gTrafficState = {
+    .activePanel  = 1,
+    .state        = "red",
+    .greenSeconds = 0,
+    .healthOk     = 1,
+    .nightMode    = 0
+};
 
+// ============================================================
+// Private: write light pattern to TC74HC573 latch
+// ============================================================
 static void SetLights(uint8_t pattern)
 {
-    // Write 6 data bits to LATCH_1 through LATCH_6
     HAL_GPIO_WritePin(LATCH_1_GPIO_Port, LATCH_1_Pin,
-                      ((pattern >> 0) & 1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+        ((pattern>>0)&1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LATCH_2_GPIO_Port, LATCH_2_Pin,
-                      ((pattern >> 1) & 1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+        ((pattern>>1)&1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LATCH_3_GPIO_Port, LATCH_3_Pin,
-                      ((pattern >> 2) & 1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+        ((pattern>>2)&1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LATCH_4_GPIO_Port, LATCH_4_Pin,
-                      ((pattern >> 3) & 1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+        ((pattern>>3)&1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LATCH_5_GPIO_Port, LATCH_5_Pin,
-                      ((pattern >> 4) & 1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+        ((pattern>>4)&1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LATCH_6_GPIO_Port, LATCH_6_Pin,
-                      ((pattern >> 5) & 1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+        ((pattern>>5)&1) ? GPIO_PIN_SET : GPIO_PIN_RESET);
 
-    // Enable CBB1 (OE# = LOW = active), disable CBB2 and CBB3
+    // Enable CBB1 only (OE# = LOW = active)
     HAL_GPIO_WritePin(LATCH_SELECT_1_GPIO_Port, LATCH_SELECT_1_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LATCH_SELECT_2_GPIO_Port, LATCH_SELECT_2_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(LATCH_SELECT_3_GPIO_Port, LATCH_SELECT_3_Pin, GPIO_PIN_SET);
 }
 
 // ============================================================
-// Private: Wait N real seconds using RTC 1Hz semaphore
+// Private: wait N real seconds via RTC 1Hz semaphore
 // ============================================================
-
 static void WaitSeconds(uint32_t seconds)
 {
     for (uint32_t i = 0; i < seconds; i++) {
-        // Block until ISR releases semaphore (fires every 1 second)
         osSemaphoreAcquire(rtcTickSemaphore, osWaitForever);
     }
 }
 
 // ============================================================
-// Private: Update green time from RTC (auto mode only)
+// Private: compute proportional timing from YOLO counts
 // ============================================================
+typedef struct { uint8_t first; uint32_t p1Green; uint32_t p2Green; } CyclePlan_t;
 
-static void UpdateTimingFromRTC(void)
+static CyclePlan_t PlanFromDensity(const TrafficDensity_t *d)
 {
-    if (timingMode != TIMING_AUTO) return;
+    CyclePlan_t plan;
+    plan.first = (d->panel1_count >= d->panel2_count) ? 1 : 2;
 
-    if (RTC_IsRushHour()) {
-        greenSeconds = 8;   // Peak traffic — longer green
-    } else if (RTC_IsNight()) {
-        greenSeconds = 3;   // Low traffic — shorter cycle
-    } else {
-        greenSeconds = 5;   // Normal
+    uint16_t total = d->panel1_count + d->panel2_count;
+    if (total == 0) {
+        plan.p1Green = plan.p2Green = MIN_GREEN;
+        return plan;
     }
+
+    uint32_t budget = TOTAL_GREEN_BUDGET - 2u * MIN_GREEN;
+    plan.p1Green = MIN_GREEN + ((uint32_t)d->panel1_count * budget) / total;
+    plan.p2Green = TOTAL_GREEN_BUDGET - plan.p1Green;
+    plan.p1Green = CLAMP(plan.p1Green, MIN_GREEN, MAX_GREEN);
+    plan.p2Green = CLAMP(plan.p2Green, MIN_GREEN, MAX_GREEN);
+    return plan;
+}
+
+static CyclePlan_t PlanFromRTC(void)
+{
+    CyclePlan_t plan = {1, 5, 5};
+    if (RTC_IsRushHour()) { plan.p1Green = plan.p2Green = 8; }
+    return plan;
 }
 
 // ============================================================
-// Public API
+// Private: run one full green/yellow cycle
 // ============================================================
+static void RunCycle(const CyclePlan_t *plan)
+{
+    uint8_t  A       = plan->first;
+    uint8_t  B       = (A == 1) ? 2 : 1;
+    uint32_t Agreen  = (A == 1) ? plan->p1Green : plan->p2Green;
+    uint32_t Bgreen  = (A == 1) ? plan->p2Green : plan->p1Green;
 
+    uint8_t AGreen_bit  = (A == 1) ? P1_GREEN  : P2_GREEN;
+    uint8_t AYellow_bit = (A == 1) ? P1_YELLOW : P2_YELLOW;
+    uint8_t ARed_bit    = (A == 1) ? P1_RED    : P2_RED;
+    uint8_t BGreen_bit  = (B == 1) ? P1_GREEN  : P2_GREEN;
+    uint8_t BYellow_bit = (B == 1) ? P1_YELLOW : P2_YELLOW;
+    uint8_t BRed_bit    = (B == 1) ? P1_RED    : P2_RED;
+
+    // Phase 1: A GREEN, B RED
+    gTrafficState.activePanel  = A;
+    gTrafficState.greenSeconds = Agreen;
+    gTrafficState.nightMode    = 0;
+    strncpy((char*)gTrafficState.state, "green", 8);
+    SetLights(AGreen_bit | BRed_bit);
+    HAL_GPIO_WritePin(LED_PIN_GPIO_Port, LED_PIN_Pin, GPIO_PIN_SET);
+    WaitSeconds(Agreen);
+
+    // Phase 2: A YELLOW, B RED
+    strncpy((char*)gTrafficState.state, "yellow", 8);
+    SetLights(AYellow_bit | BRed_bit);
+    WaitSeconds(YELLOW_SEC);
+
+    // Phase 3: B GREEN, A RED
+    gTrafficState.activePanel  = B;
+    gTrafficState.greenSeconds = Bgreen;
+    strncpy((char*)gTrafficState.state, "green", 8);
+    SetLights(BGreen_bit | ARed_bit);
+    HAL_GPIO_WritePin(LED_PIN_GPIO_Port, LED_PIN_Pin, GPIO_PIN_RESET);
+    WaitSeconds(Bgreen);
+
+    // Phase 4: B YELLOW, A RED
+    strncpy((char*)gTrafficState.state, "yellow", 8);
+    SetLights(BYellow_bit | ARed_bit);
+    WaitSeconds(YELLOW_SEC);
+}
+
+// ============================================================
+// Private: night mode — both panels blink yellow alternately
+// ============================================================
+static void RunNightMode(void)
+{
+    gTrafficState.nightMode = 1;
+    strncpy((char*)gTrafficState.state, "night", 8);
+
+    SetLights(P1_YELLOW | P2_RED);
+    WaitSeconds(1);
+    SetLights(P1_RED | P2_YELLOW);
+    WaitSeconds(1);
+}
+
+// ============================================================
+// Public
+// ============================================================
 void Traffic_Init(void)
 {
-    // All lights off at startup
     SetLights(0x00);
+    gTrafficState.healthOk = 1;
 }
-
-void Traffic_SetGreenTime(uint32_t seconds)
-{
-    // Clamp to safe range
-    if (seconds < 3)  seconds = 3;
-    if (seconds > 30) seconds = 30;
-
-    greenSeconds = seconds;
-    timingMode   = TIMING_MANUAL;  // Disable auto-RTC override
-}
-
-// ============================================================
-// FreeRTOS Task
-// ============================================================
 
 void TrafficManagerTask(void *argument)
 {
     Traffic_Init();
+    TrafficDensity_t density;
+    CyclePlan_t plan;
 
     for (;;)
     {
-        // Re-evaluate timing at start of each full cycle
-        UpdateTimingFromRTC();
+        // Night mode check first
+        if (RTC_IsNight()) {
+            RunNightMode();
+            continue;
+        }
+        gTrafficState.nightMode = 0;
 
-        // --------------------------------------------------
-        // Phase 1: Panel 1 GREEN + Panel 2 RED
-        // --------------------------------------------------
-        SetLights(P1_GREEN | P2_RED);
-        HAL_GPIO_WritePin(LED_PIN_GPIO_Port, LED_PIN_Pin, GPIO_PIN_SET); // debug LED on
-        WaitSeconds(greenSeconds);
+        // Try to get fresh YOLO density data (non-blocking)
+        osStatus_t s = osMessageQueueGet(densityQueueHandle, &density, NULL, 0);
 
-        // --------------------------------------------------
-        // Phase 2: Panel 1 YELLOW + Panel 2 RED
-        // --------------------------------------------------
-        SetLights(P1_YELLOW | P2_RED);
-        WaitSeconds(yellowSeconds);
+        if (s == osOK) {
+            plan = PlanFromDensity(&density);
+        } else {
+            plan = PlanFromRTC();   // fallback: RTC time-based
+        }
 
-        // --------------------------------------------------
-        // Phase 3: Panel 1 RED + Panel 2 GREEN
-        // --------------------------------------------------
-        SetLights(P1_RED | P2_GREEN);
-        HAL_GPIO_WritePin(LED_PIN_GPIO_Port, LED_PIN_Pin, GPIO_PIN_RESET); // debug LED off
-        WaitSeconds(greenSeconds);
-
-        // --------------------------------------------------
-        // Phase 4: Panel 1 RED + Panel 2 YELLOW
-        // --------------------------------------------------
-        SetLights(P1_RED | P2_YELLOW);
-        WaitSeconds(yellowSeconds);
-
-        // Loop → back to Phase 1
+        RunCycle(&plan);
     }
 }
