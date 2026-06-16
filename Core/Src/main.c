@@ -322,47 +322,39 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, LED_PIN_Pin|LATCH_7_Pin|LATCH_8_Pin|LATCH_SELECT_1_Pin
-                          |LATCH_SELECT_2_Pin|LATCH_SELECT_3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, LED_PIN_Pin|LATCH_7_Pin|LATCH_8_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LATCH_6_Pin|LATCH_5_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LATCH_6_Pin|LATCH_5_Pin|LATCH_SELECT_1_Pin|LATCH_SELECT_2_Pin
+                          |LATCH_SELECT_3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LATCH_3_Pin|LATCH_4_Pin|LATCH_1_Pin|LATCH_2_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LED_PIN_Pin LATCH_7_Pin LATCH_8_Pin LATCH_SELECT_1_Pin
-                           LATCH_SELECT_2_Pin LATCH_SELECT_3_Pin */
-  GPIO_InitStruct.Pin = LED_PIN_Pin|LATCH_7_Pin|LATCH_8_Pin|LATCH_SELECT_1_Pin
-                          |LATCH_SELECT_2_Pin|LATCH_SELECT_3_Pin;
+  /*Configure GPIO pins : LED_PIN_Pin LATCH_7_Pin LATCH_8_Pin */
+  GPIO_InitStruct.Pin = LED_PIN_Pin|LATCH_7_Pin|LATCH_8_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : RTC_INT_In_Pin */
-  GPIO_InitStruct.Pin = RTC_INT_In_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(RTC_INT_In_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : LATCH_6_Pin LATCH_5_Pin */
-  GPIO_InitStruct.Pin = LATCH_6_Pin|LATCH_5_Pin;
+  /*Configure GPIO pins : LATCH_6_Pin LATCH_5_Pin LATCH_SELECT_1_Pin LATCH_SELECT_2_Pin
+                           LATCH_SELECT_3_Pin */
+  GPIO_InitStruct.Pin = LATCH_6_Pin|LATCH_5_Pin|LATCH_SELECT_1_Pin|LATCH_SELECT_2_Pin
+                          |LATCH_SELECT_3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : RTC_32KHZ_In_Pin */
-  GPIO_InitStruct.Pin = RTC_32KHZ_In_Pin;
+  /*Configure GPIO pins : RTC_32KHZ_In_Pin RTC_INT_In_Pin */
+  GPIO_InitStruct.Pin = RTC_32KHZ_In_Pin|RTC_INT_In_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(RTC_32KHZ_In_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : Input_1_Pin Input_2_Pin Input_3_Pin Input_4_Pin
-                           Input_5_Pin Input_6_Pin */
-  GPIO_InitStruct.Pin = Input_1_Pin|Input_2_Pin|Input_3_Pin|Input_4_Pin
-                          |Input_5_Pin|Input_6_Pin;
+  /*Configure GPIO pins : Input_5_Pin Input_6_Pin */
+  GPIO_InitStruct.Pin = Input_5_Pin|Input_6_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -377,9 +369,6 @@ static void MX_GPIO_Init(void)
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI2_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI2_IRQn);
-
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

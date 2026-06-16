@@ -4,46 +4,38 @@
 /**
  * uart_handler.h
  * --------------
- * Two-way JSON UART communication with Orange Pi.
+ * STM32 ↔ Orange Pi UART communication.
  *
  * Orange Pi → STM32:  {"p1":5,"p2":12}
- *   p1 = Panel 1 vehicle count (Direction A)
- *   p2 = Panel 2 vehicle count (Direction B)
- *
- * STM32 → Orange Pi:  {"status":"ok","green":1,"t":8}
- *   green = which panel is green (1 or 2)
- *   t     = green duration in seconds
+ * STM32 → Orange Pi:  {"type":"light-status-update","data":{...}}
+ *                      {"type":"microcontroller_health_update","data":{...}}
  */
 
 #include "main.h"
 #include "cmsis_os.h"
 
-// Traffic density data — passed via queue to TrafficManagerTask
+// Density data from Orange Pi YOLO
 typedef struct {
-    uint16_t panel1_count;   // vehicle count from YOLO for Panel 1
-    uint16_t panel2_count;   // vehicle count from YOLO for Panel 2
+    uint16_t panel1_count;
+    uint16_t panel2_count;
 } TrafficDensity_t;
 
-// Queue handle — TrafficManagerTask reads from this
+// Queue: ISR puts data here, TrafficManagerTask reads
 extern osMessageQueueId_t densityQueueHandle;
 
-/**
- * @brief  Init UART handler: create queue, start DMA reception.
- *         Call AFTER osKernelInitialize(), BEFORE osKernelStart().
- * @param  huart  Pointer to UART handle (huart1)
- */
+// Init: create queue + start DMA RX
 void UART_Handler_Init(UART_HandleTypeDef *huart);
 
-/**
- * @brief  FreeRTOS task — processes received JSON, sends ACK.
- *         Do NOT call directly. Pass to osThreadNew().
- */
-void UARTHandlerTask(void *argument);
-
-/**
- * @brief  Call from HAL_UARTEx_RxEventCallback when huart == huart1.
- *         Handles idle-line detection from DMA.
- */
+// ISR callback — call from HAL_UARTEx_RxEventCallback
 void UART_Handler_RxEvent(UART_HandleTypeDef *huart, uint16_t size);
 
-#endif /* UART_HANDLER_H */
+// TX functions — called from traffic_controller.c on phase change
+void UART_SendLightStatus(uint8_t lightNum, uint8_t junctionNum);
+
+// TX health — called from UARTHandlerTask every 5 seconds
+void UART_SendMCUHealth(void);
+
+// FreeRTOS task
+void UARTHandlerTask(void *argument);
+
+#endif

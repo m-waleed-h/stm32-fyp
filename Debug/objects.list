@@ -10,6 +10,7 @@
 "./Core/Src/sysmem.o"
 "./Core/Src/system_stm32f4xx.o"
 "./Core/Src/traffic_controller.o"
+"./Core/Src/uart_handler.o"
 "./Core/Startup/startup_stm32f401rctx.o"
 "./Core/ThreadSafe/newlib_lock_glue.o"
 "./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.o"

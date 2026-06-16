@@ -1,0 +1,7 @@
+../Core/Src/uart_handler.c:42:12:ParseDensityJSON	4
+../Core/Src/uart_handler.c:57:13:SendJSON	1
+../Core/Src/uart_handler.c:66:6:UART_SendLightStatus	6
+../Core/Src/uart_handler.c:106:6:UART_SendMCUHealth	4
+../Core/Src/uart_handler.c:134:6:UART_Handler_Init	1
+../Core/Src/uart_handler.c:149:6:UART_Handler_RxEvent	4
+../Core/Src/uart_handler.c:168:6:UARTHandlerTask	3

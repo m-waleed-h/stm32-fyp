@@ -1,6 +1,8 @@
-../Core/Src/traffic_controller.c:47:13:SetLights	1
-../Core/Src/traffic_controller.c:73:13:WaitSeconds	2
-../Core/Src/traffic_controller.c:85:13:UpdateTimingFromRTC	4
-../Core/Src/traffic_controller.c:102:6:Traffic_Init	1
-../Core/Src/traffic_controller.c:108:6:Traffic_SetGreenTime	3
-../Core/Src/traffic_controller.c:122:6:TrafficManagerTask	1
+../Core/Src/traffic_controller.c:56:13:SetLights	1
+../Core/Src/traffic_controller.c:80:13:WaitSeconds	2
+../Core/Src/traffic_controller.c:96:20:PlanFromDensity	3
+../Core/Src/traffic_controller.c:115:20:PlanFromRTC	2
+../Core/Src/traffic_controller.c:127:13:RunCycle	10
+../Core/Src/traffic_controller.c:192:13:RunNightMode	1
+../Core/Src/traffic_controller.c:213:6:Traffic_Init	1
+../Core/Src/traffic_controller.c:219:6:TrafficManagerTask	3

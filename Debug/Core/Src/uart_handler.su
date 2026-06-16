@@ -1,0 +1,7 @@
+../Core/Src/uart_handler.c:42:12:ParseDensityJSON	32	static
+../Core/Src/uart_handler.c:57:13:SendJSON	16	static
+../Core/Src/uart_handler.c:66:6:UART_SendLightStatus	112	static
+../Core/Src/uart_handler.c:106:6:UART_SendMCUHealth	40	static
+../Core/Src/uart_handler.c:134:6:UART_Handler_Init	16	static
+../Core/Src/uart_handler.c:149:6:UART_Handler_RxEvent	24	static
+../Core/Src/uart_handler.c:168:6:UARTHandlerTask	24	static

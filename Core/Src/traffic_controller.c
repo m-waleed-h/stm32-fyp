@@ -5,6 +5,10 @@
  *   1. Orange Pi YOLO density → proportional green time
  *   2. RTC time-of-day fallback → rush hour / normal
  *   3. Night mode (23:00–05:00) → yellow blink both panels
+ *
+ * TX to Orange Pi:
+ *   UART_SendLightStatus() called on every phase change
+ *   Format: {"type":"light-status-update","data":{...}}
  */
 
 #include "traffic_controller.h"
@@ -25,12 +29,15 @@
 // ============================================================
 // Timing constants
 // ============================================================
-#define TOTAL_GREEN_BUDGET   20u   // total seconds per cycle
-#define MIN_GREEN             4u   // minimum green per panel
-#define MAX_GREEN            14u   // maximum green per panel
-#define YELLOW_SEC            2u   // fixed yellow duration
+#define TOTAL_GREEN_BUDGET   20u
+#define MIN_GREEN             4u
+#define MAX_GREEN            14u
+#define YELLOW_SEC            2u
 
 #define CLAMP(x,lo,hi) ((x)<(lo)?(lo):((x)>(hi)?(hi):(x)))
+
+// Junction number — change if needed
+#define JUNCTION_NUM   1
 
 // ============================================================
 // Shared state — read by uart_handler to build status JSON
@@ -80,7 +87,11 @@ static void WaitSeconds(uint32_t seconds)
 // ============================================================
 // Private: compute proportional timing from YOLO counts
 // ============================================================
-typedef struct { uint8_t first; uint32_t p1Green; uint32_t p2Green; } CyclePlan_t;
+typedef struct {
+    uint8_t  first;
+    uint32_t p1Green;
+    uint32_t p2Green;
+} CyclePlan_t;
 
 static CyclePlan_t PlanFromDensity(const TrafficDensity_t *d)
 {
@@ -104,7 +115,9 @@ static CyclePlan_t PlanFromDensity(const TrafficDensity_t *d)
 static CyclePlan_t PlanFromRTC(void)
 {
     CyclePlan_t plan = {1, 5, 5};
-    if (RTC_IsRushHour()) { plan.p1Green = plan.p2Green = 8; }
+    if (RTC_IsRushHour()) {
+        plan.p1Green = plan.p2Green = 8;
+    }
     return plan;
 }
 
@@ -113,10 +126,10 @@ static CyclePlan_t PlanFromRTC(void)
 // ============================================================
 static void RunCycle(const CyclePlan_t *plan)
 {
-    uint8_t  A       = plan->first;
-    uint8_t  B       = (A == 1) ? 2 : 1;
-    uint32_t Agreen  = (A == 1) ? plan->p1Green : plan->p2Green;
-    uint32_t Bgreen  = (A == 1) ? plan->p2Green : plan->p1Green;
+    uint8_t  A      = plan->first;
+    uint8_t  B      = (A == 1) ? 2 : 1;
+    uint32_t Agreen = (A == 1) ? plan->p1Green : plan->p2Green;
+    uint32_t Bgreen = (A == 1) ? plan->p2Green : plan->p1Green;
 
     uint8_t AGreen_bit  = (A == 1) ? P1_GREEN  : P2_GREEN;
     uint8_t AYellow_bit = (A == 1) ? P1_YELLOW : P2_YELLOW;
@@ -125,31 +138,51 @@ static void RunCycle(const CyclePlan_t *plan)
     uint8_t BYellow_bit = (B == 1) ? P1_YELLOW : P2_YELLOW;
     uint8_t BRed_bit    = (B == 1) ? P1_RED    : P2_RED;
 
+    // --------------------------------------------------
     // Phase 1: A GREEN, B RED
+    // --------------------------------------------------
     gTrafficState.activePanel  = A;
     gTrafficState.greenSeconds = Agreen;
     gTrafficState.nightMode    = 0;
     strncpy((char*)gTrafficState.state, "green", 8);
+
     SetLights(AGreen_bit | BRed_bit);
     HAL_GPIO_WritePin(LED_PIN_GPIO_Port, LED_PIN_Pin, GPIO_PIN_SET);
+    UART_SendLightStatus(A, JUNCTION_NUM);   // → Orange Pi
+
     WaitSeconds(Agreen);
 
+    // --------------------------------------------------
     // Phase 2: A YELLOW, B RED
+    // --------------------------------------------------
     strncpy((char*)gTrafficState.state, "yellow", 8);
+
     SetLights(AYellow_bit | BRed_bit);
+    UART_SendLightStatus(A, JUNCTION_NUM);   // → Orange Pi
+
     WaitSeconds(YELLOW_SEC);
 
+    // --------------------------------------------------
     // Phase 3: B GREEN, A RED
+    // --------------------------------------------------
     gTrafficState.activePanel  = B;
     gTrafficState.greenSeconds = Bgreen;
     strncpy((char*)gTrafficState.state, "green", 8);
+
     SetLights(BGreen_bit | ARed_bit);
     HAL_GPIO_WritePin(LED_PIN_GPIO_Port, LED_PIN_Pin, GPIO_PIN_RESET);
+    UART_SendLightStatus(B, JUNCTION_NUM);   // → Orange Pi
+
     WaitSeconds(Bgreen);
 
+    // --------------------------------------------------
     // Phase 4: B YELLOW, A RED
+    // --------------------------------------------------
     strncpy((char*)gTrafficState.state, "yellow", 8);
+
     SetLights(BYellow_bit | ARed_bit);
+    UART_SendLightStatus(B, JUNCTION_NUM);   // → Orange Pi
+
     WaitSeconds(YELLOW_SEC);
 }
 
@@ -161,9 +194,16 @@ static void RunNightMode(void)
     gTrafficState.nightMode = 1;
     strncpy((char*)gTrafficState.state, "night", 8);
 
+    // Panel 1 yellow
+    gTrafficState.activePanel = 1;
     SetLights(P1_YELLOW | P2_RED);
+    UART_SendLightStatus(1, JUNCTION_NUM);   // → Orange Pi
     WaitSeconds(1);
+
+    // Panel 2 yellow
+    gTrafficState.activePanel = 2;
     SetLights(P1_RED | P2_YELLOW);
+    UART_SendLightStatus(2, JUNCTION_NUM);   // → Orange Pi
     WaitSeconds(1);
 }
 
@@ -195,9 +235,9 @@ void TrafficManagerTask(void *argument)
         osStatus_t s = osMessageQueueGet(densityQueueHandle, &density, NULL, 0);
 
         if (s == osOK) {
-            plan = PlanFromDensity(&density);
+            plan = PlanFromDensity(&density);   // YOLO-based
         } else {
-            plan = PlanFromRTC();   // fallback: RTC time-based
+            plan = PlanFromRTC();               // RTC fallback
         }
 
         RunCycle(&plan);

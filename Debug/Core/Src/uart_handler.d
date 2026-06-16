@@ -1,5 +1,5 @@
-Core/Src/traffic_controller.o: ../Core/Src/traffic_controller.c \
- ../Core/Inc/traffic_controller.h ../Core/Inc/main.h \
+Core/Src/uart_handler.o: ../Core/Src/uart_handler.c \
+ ../Core/Inc/uart_handler.h ../Core/Inc/main.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -41,9 +41,9 @@ Core/Src/traffic_controller.o: ../Core/Src/traffic_controller.c \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h \
- ../Core/Inc/rtc_manager.h ../Core/Inc/ds3231.h \
- ../Core/Inc/uart_handler.h
-../Core/Inc/traffic_controller.h:
+ ../Core/Inc/traffic_controller.h ../Core/Inc/rtc_manager.h \
+ ../Core/Inc/ds3231.h
+../Core/Inc/uart_handler.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -86,6 +86,6 @@ Core/Src/traffic_controller.o: ../Core/Src/traffic_controller.c \
 ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h:
+../Core/Inc/traffic_controller.h:
 ../Core/Inc/rtc_manager.h:
 ../Core/Inc/ds3231.h:
-../Core/Inc/uart_handler.h:
