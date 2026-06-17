@@ -47,12 +47,27 @@ I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart1_tx;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for UARTTask */
+osThreadId_t UARTTaskHandle;
+const osThreadAttr_t UARTTask_attributes = {
+  .name = "UARTTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for RTCTask */
+osThreadId_t RTCTaskHandle;
+const osThreadAttr_t RTCTask_attributes = {
+  .name = "RTCTask",
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
@@ -69,6 +84,8 @@ static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
 void StartDefaultTask(void *argument);
+void StartUARTTask(void *argument);
+void StartRTCTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -143,6 +160,12 @@ int main(void)
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of UARTTask */
+  UARTTaskHandle = osThreadNew(StartUARTTask, NULL, &UARTTask_attributes);
+
+  /* creation of RTCTask */
+  RTCTaskHandle = osThreadNew(StartRTCTask, NULL, &RTCTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -300,6 +323,9 @@ static void MX_DMA_Init(void)
   /* DMA2_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 
 }
 
@@ -347,11 +373,17 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : RTC_32KHZ_In_Pin RTC_INT_In_Pin */
-  GPIO_InitStruct.Pin = RTC_32KHZ_In_Pin|RTC_INT_In_Pin;
+  /*Configure GPIO pin : RTC_32KHZ_In_Pin */
+  GPIO_InitStruct.Pin = RTC_32KHZ_In_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(RTC_32KHZ_In_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : RTC_INT_In_Pin */
+  GPIO_InitStruct.Pin = RTC_INT_In_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(RTC_INT_In_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Input_5_Pin Input_6_Pin */
   GPIO_InitStruct.Pin = Input_5_Pin|Input_6_Pin;
@@ -370,6 +402,9 @@ static void MX_GPIO_Init(void)
   HAL_NVIC_SetPriority(EXTI2_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI2_IRQn);
 
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
@@ -381,7 +416,6 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN Header_StartDefaultTask */
 /**
-  * @brief  Function implementing the defaultTask thread.
   * @param  argument: Not used
   * @retval None
   */
@@ -395,6 +429,42 @@ void StartDefaultTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartUARTTask */
+/**
+* @brief Function implementing the UARTTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartUARTTask */
+void StartUARTTask(void *argument)
+{
+  /* USER CODE BEGIN StartUARTTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartUARTTask */
+}
+
+/* USER CODE BEGIN Header_StartRTCTask */
+/**
+* @brief Function implementing the RTCTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartRTCTask */
+void StartRTCTask(void *argument)
+{
+  /* USER CODE BEGIN StartRTCTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartRTCTask */
 }
 
 /**

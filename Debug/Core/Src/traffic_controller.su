@@ -1,8 +1,8 @@
-../Core/Src/traffic_controller.c:56:13:SetLights	16	static
-../Core/Src/traffic_controller.c:80:13:WaitSeconds	24	static
-../Core/Src/traffic_controller.c:96:20:PlanFromDensity	40	static
-../Core/Src/traffic_controller.c:115:20:PlanFromRTC	40	static
-../Core/Src/traffic_controller.c:127:13:RunCycle	40	static
-../Core/Src/traffic_controller.c:192:13:RunNightMode	8	static
-../Core/Src/traffic_controller.c:213:6:Traffic_Init	8	static
-../Core/Src/traffic_controller.c:219:6:TrafficManagerTask	56	static
+../Core/Src/traffic_controller.c:52:13:SetLights	16	static
+../Core/Src/traffic_controller.c:73:13:WaitSeconds	24	static
+../Core/Src/traffic_controller.c:88:20:PlanFromDensity	40	static
+../Core/Src/traffic_controller.c:108:20:PlanFromRTC	40	static
+../Core/Src/traffic_controller.c:118:13:RunCycle	40	static
+../Core/Src/traffic_controller.c:165:13:RunNightMode	8	static
+../Core/Src/traffic_controller.c:182:6:Traffic_Init	8	static
+../Core/Src/traffic_controller.c:189:6:TrafficManagerTask	72	static

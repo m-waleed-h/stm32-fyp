@@ -1,5 +1,6 @@
 "./Core/Src/ds3231.o"
 "./Core/Src/freertos.o"
+"./Core/Src/logger.o"
 "./Core/Src/main.o"
 "./Core/Src/rtc_manager.o"
 "./Core/Src/serialControl.o"

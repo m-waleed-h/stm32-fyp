@@ -78,6 +78,7 @@ void Error_Handler(void);
 #define LATCH_SELECT_3_GPIO_Port GPIOA
 #define RTC_INT_In_Pin GPIO_PIN_6
 #define RTC_INT_In_GPIO_Port GPIOA
+#define RTC_INT_In_EXTI_IRQn EXTI9_5_IRQn
 #define Input_5_Pin GPIO_PIN_7
 #define Input_5_GPIO_Port GPIOA
 #define LATCH_3_Pin GPIO_PIN_0

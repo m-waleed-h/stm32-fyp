@@ -1,0 +1,5 @@
+../Core/Src/logger.c:34:6:Logger_Init	16	static
+../Core/Src/logger.c:40:6:Logger_Log	40	static
+../Core/Src/logger.c:54:6:Logger_LogF	176	static
+../Core/Src/logger.c:68:16:CheckRTC	24	static
+../Core/Src/logger.c:76:6:Logger_BootDiagnostic	56	static
